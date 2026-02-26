@@ -18,7 +18,8 @@ const app = express();
 const allowedOrigins = [
   'https://cpads.netlify.app',
   'https://cpaadmins.netlify.app',
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'http://localhost:3001'
 ];
 
 app.use(cors({
@@ -52,7 +53,16 @@ const connectDB = async () => {
   }
 };
 
-connectDB();
+// ensure default levels exist
+const Level = require('./models/Level');
+connectDB().then(async () => {
+  try {
+    await Level.ensureDefaults();
+    console.log('Default levels ensured');
+  } catch (err) {
+    console.error('Error ensuring default levels', err.message);
+  }
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -61,7 +71,14 @@ app.use('/api/ads', require('./routes/ads'));
 app.use('/api/referral', require('./routes/referral'));
 app.use('/api/withdraw', require('./routes/withdraw'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/admin/crypto-settings', require('./routes/adminCryptoSettings'));
+app.use('/api/crypto', require('./routes/crypto'));
 app.use('/api/public', require('./routes/public'));
+
+// level & deposit system
+app.use('/api/levels', require('./routes/levels'));
+app.use('/api/deposits', require('./routes/deposits'));
+app.use('/api/admin/reports', require('./routes/adminReports'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -78,7 +95,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`Server running on port ${PORT}`);
 });

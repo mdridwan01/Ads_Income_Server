@@ -3,6 +3,7 @@ const {
   requestWithdraw,
   getWithdrawHistory,
   getAllWithdrawals,
+  getPublicWithdrawals,
   approveWithdraw,
   rejectWithdraw,
   completeWithdraw,
@@ -13,6 +14,9 @@ const router = express.Router();
 
 router.post('/request', protect, requestWithdraw);
 router.get('/history', protect, getWithdrawHistory);
+
+// Public routes
+router.get('/public/all', getPublicWithdrawals);
 
 // Admin routes
 router.get('/all', protect, adminOnly, getAllWithdrawals);

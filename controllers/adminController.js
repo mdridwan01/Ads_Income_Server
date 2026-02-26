@@ -169,6 +169,34 @@ exports.adminLogin = async (req, res) => {
   }
 };
 
+// Manage wallet addresses
+exports.getWalletAddresses = async (req, res) => {
+  try {
+    const settings = await Settings.findOne();
+    res.status(200).json({
+      success: true,
+      wallets: settings?.cryptoWallets || { trc20: '', erc20: '' },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateWalletAddresses = async (req, res) => {
+  try {
+    const { trc20, erc20 } = req.body;
+    let settings = await Settings.findOne();
+    if (!settings) {
+      settings = new Settings();
+    }
+    settings.cryptoWallets = { trc20, erc20 };
+    await settings.save();
+    res.status(200).json({ success: true, wallets: settings.cryptoWallets });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // Get all referral codes
 exports.getAllReferralCodes = async (req, res) => {
   try {
@@ -438,6 +466,47 @@ exports.updateSignupBonusSettings = async (req, res) => {
       success: true,
       message: 'Signup bonus settings updated successfully',
       settings,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Clear suspicious flag from user (admin only)
+exports.clearSuspiciousFlag = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    if (!user.is_suspicious) {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not flagged as suspicious',
+      });
+    }
+
+    user.is_suspicious = false;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Suspicious flag cleared successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        is_suspicious: user.is_suspicious,
+      },
     });
   } catch (error) {
     res.status(500).json({

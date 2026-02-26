@@ -95,6 +95,9 @@ exports.register = async (req, res) => {
         referral: user.referral,
         withdrawalMethod: user.withdrawalMethod || '',
         withdrawalPhoneNumber: user.withdrawalPhoneNumber || '',
+        level: user.level,
+        is_suspicious: user.is_suspicious,
+        last_withdraw_at: user.last_withdraw_at,
         createdAt: user.createdAt,
       },
     });
@@ -188,6 +191,9 @@ exports.login = async (req, res) => {
         referral: user.referral,
         withdrawalMethod: user.withdrawalMethod || '',
         withdrawalPhoneNumber: user.withdrawalPhoneNumber || '',
+        level: user.level,
+        is_suspicious: user.is_suspicious,
+        last_withdraw_at: user.last_withdraw_at,
         createdAt: user.createdAt,
       },
     });

@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Level = require('../models/Level');
+const Deposit = require('../models/Deposit');
 const bcrypt = require('bcryptjs');
 
 // Get user profile
@@ -11,6 +13,31 @@ exports.getProfile = async (req, res) => {
         success: false,
         message: 'User not found',
       });
+    }
+    // fetch current and next level info
+    const currentLevel = await Level.findOne({ id: user.level });
+    const nextLevel = await Level.findOne({ id: user.level + 1 });
+
+    // compute withdrawal cooldown remaining (ms)
+    let cooldownRemaining = 0;
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+    if (user.last_withdraw_at) {
+      const nextAllowed = new Date(user.last_withdraw_at.getTime() + COOLDOWN_MS);
+      const now = new Date();
+      if (nextAllowed > now) cooldownRemaining = nextAllowed - now;
+    }
+
+    const withdrawalAllowed = user.level >= 5 && !user.is_suspicious && cooldownRemaining === 0;
+
+    // total approved deposits amount
+    // prefer wallet.depositBalance if available
+    let totalDeposits = user.wallet.depositBalance || 0;
+    if (!totalDeposits) {
+      const agg = await Deposit.aggregate([
+        { $match: { userId: user._id, status: 'approved' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]);
+      totalDeposits = agg.length ? agg[0].total : 0;
     }
 
     res.status(200).json({
@@ -25,6 +52,17 @@ exports.getProfile = async (req, res) => {
         withdrawalMethod: user.withdrawalMethod,
         withdrawalPhoneNumber: user.withdrawalPhoneNumber,
         isBlocked: user.isBlocked,
+        level: user.level,
+        level_name: currentLevel ? currentLevel.name : null,
+        level_badge: currentLevel
+          ? { name: currentLevel.badge_name || currentLevel.name, color: currentLevel.badge_color }
+          : null,
+        next_level_price: nextLevel ? nextLevel.price : null,
+        withdrawal_allowed: withdrawalAllowed,
+        cooldown_remaining: cooldownRemaining,
+        total_deposits: totalDeposits,
+        is_suspicious: user.is_suspicious,
+        last_withdraw_at: user.last_withdraw_at,
       },
     });
   } catch (error) {
@@ -79,6 +117,9 @@ exports.getWallet = async (req, res) => {
     res.status(200).json({
       success: true,
       wallet: user.wallet,
+      level: user.level,
+      last_withdraw_at: user.last_withdraw_at,
+      is_suspicious: user.is_suspicious,
     });
   } catch (error) {
     res.status(500).json({
@@ -334,6 +375,51 @@ exports.changePassword = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Password changed successfully',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Admin: Update user details
+exports.adminUpdateUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { username, email, phone, level, is_suspicious } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // Update allowed fields
+    if (username !== undefined) user.username = username;
+    if (email !== undefined) user.email = email;
+    if (phone !== undefined) user.phone = phone;
+    if (level !== undefined) user.level = parseInt(level);
+    if (is_suspicious !== undefined) user.is_suspicious = Boolean(is_suspicious);
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'User updated successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        level: user.level,
+        is_suspicious: user.is_suspicious,
+        wallet: user.wallet,
+        isBlocked: user.isBlocked,
+      },
     });
   } catch (error) {
     res.status(500).json({

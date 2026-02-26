@@ -9,6 +9,7 @@ const {
   updateUserProfile,
   updateWithdrawalSettings,
   changePassword,
+  adminUpdateUser,
 } = require('../controllers/usersController');
 const { protect, adminOnly } = require('../middleware/auth');
 
@@ -24,5 +25,6 @@ router.put('/wallet', protect, updateWallet);
 // Admin routes
 router.get('/all', protect, adminOnly, getAllUsers);
 router.put('/:userId/block', protect, adminOnly, blockUnblockUser);
+router.put('/:userId', protect, adminOnly, adminUpdateUser);
 
 module.exports = router;

@@ -30,6 +30,10 @@ const settingsSchema = new mongoose.Schema(
         min: 0,
       },
     },
+    cryptoWallets: {
+      trc20: { type: String, default: '' },
+      erc20: { type: String, default: '' },
+    },
   },
   { timestamps: true }
 );

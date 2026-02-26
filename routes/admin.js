@@ -11,6 +11,7 @@ const {
   getSettings,
   updateReferralSettings,
   updateSignupBonusSettings,
+  clearSuspiciousFlag,
 } = require('../controllers/adminController');
 const { protect, adminOnly } = require('../middleware/auth');
 
@@ -27,5 +28,10 @@ router.put('/referral/:userId/enable', protect, adminOnly, enableReferralCode);
 router.get('/settings', protect, adminOnly, getSettings);
 router.put('/settings/referral', protect, adminOnly, updateReferralSettings);
 router.put('/settings/signup-bonus', protect, adminOnly, updateSignupBonusSettings);
+router.put('/users/:userId/clear-suspicious', protect, adminOnly, clearSuspiciousFlag);
+
+// crypto wallet addresses
+router.get('/wallets', protect, adminOnly, require('../controllers/adminController').getWalletAddresses);
+router.put('/wallets', protect, adminOnly, require('../controllers/adminController').updateWalletAddresses);
 
 module.exports = router;

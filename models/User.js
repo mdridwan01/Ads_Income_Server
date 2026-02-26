@@ -39,6 +39,10 @@ const userSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+      depositBalance: {
+        type: Number,
+        default: 0,
+      },
       availableBalance: {
         type: Number,
         default: 0,
@@ -100,6 +104,19 @@ const userSchema = new mongoose.Schema(
         enum: ['video', 'banner', 'poster'],
       },
     ],
+    level: {
+      type: Number,
+      default: 0,
+    },
+    last_withdraw_at: {
+      type: Date,
+      default: null,
+    },
+    ip_address: String,
+    is_suspicious: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

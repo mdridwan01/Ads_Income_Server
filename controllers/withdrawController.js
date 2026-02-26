@@ -16,6 +16,27 @@ exports.requestWithdraw = async (req, res) => {
       });
     }
 
+    // only level 5 users allowed
+    if (user.level < 5) {
+      return res.status(403).json({
+        success: false,
+        message: 'Complete higher levels to unlock withdrawals',
+      });
+    }
+    // cooldown 24h
+    if (user.last_withdraw_at && new Date() - new Date(user.last_withdraw_at) < 24 * 60 * 60 * 1000) {
+      const next = new Date(user.last_withdraw_at.getTime() + 24 * 60 * 60 * 1000);
+      return res.status(400).json({
+        success: false,
+        message: `Withdrawal cooldown active until ${next.toLocaleString()}`,
+      });
+    }
+    if (user.is_suspicious) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account flagged for suspicious activity, withdrawal blocked',
+      });
+    }
     if (amount < 200) {
       return res.status(400).json({
         success: false,
@@ -141,16 +162,23 @@ exports.approveWithdraw = async (req, res) => {
     const { withdrawId } = req.params;
     const { transactionId } = req.body;
 
-    const withdraw = await Withdraw.findByIdAndUpdate(
-      withdrawId,
-      {
-        status: 'approved',
-        adminApprovalBy: req.user.id,
-        approvalDate: new Date(),
-        transactionId,
-      },
-      { new: true }
-    );
+    const withdraw = await Withdraw.findById(withdrawId);
+    if (!withdraw) {
+      return res.status(404).json({ success: false, message: 'Withdrawal not found' });
+    }
+
+    withdraw.status = 'approved';
+    withdraw.adminApprovalBy = req.user.id;
+    withdraw.approvalDate = new Date();
+    withdraw.transactionId = transactionId;
+    await withdraw.save();
+
+    // update user last_withdraw_at
+    const user = await User.findById(withdraw.userId);
+    if (user) {
+      user.last_withdraw_at = new Date();
+      await user.save();
+    }
 
     res.status(200).json({
       success: true,
@@ -227,3 +255,49 @@ exports.completeWithdraw = async (req, res) => {
     });
   }
 };
+
+// public: get all completed withdrawals (live feed with masked user info)
+exports.getPublicWithdrawals = async (req, res) => {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const withdrawals = await Withdraw.find({ status: 'completed' })
+      .populate('userId', 'username phone email')
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    // Mask user information
+    const maskedWithdrawals = withdrawals.map((wd) => ({
+      _id: wd._id,
+      amount: wd.amount,
+      withdrawalMethod: wd.withdrawalMethod,
+      createdAt: wd.createdAt,
+      username: maskUsername(wd.userId?.username || 'User'),
+      phone: maskPhone(wd.userId?.phone || 'N/A'),
+    }));
+
+    const total = await Withdraw.countDocuments({ status: 'completed' });
+    res.status(200).json({
+      success: true,
+      withdrawals: maskedWithdrawals,
+      total,
+      pages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Helper function to mask username (show first 2 chars + *)
+function maskUsername(username) {
+  if (!username || username.length <= 2) return '****';
+  return username.substring(0, 2) + '*'.repeat(username.length - 2);
+}
+
+// Helper function to mask phone (show first 3 digits + *)
+function maskPhone(phone) {
+  if (!phone || phone.length <= 3) return '****';
+  return phone.substring(0, 3) + '*'.repeat(phone.length - 3);
+}

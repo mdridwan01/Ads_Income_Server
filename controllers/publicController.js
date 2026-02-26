@@ -15,6 +15,7 @@ exports.getPublicSettings = async (req, res) => {
       success: true,
       settings: {
         referralBonus: settings.referralBonus,
+        cryptoWallets: settings.cryptoWallets || { trc20: '', erc20: '' },
       },
     });
   } catch (error) {
