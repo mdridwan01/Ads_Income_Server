@@ -22,6 +22,12 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
       select: false,
     },
+    fundPassword: {
+      type: String,
+      required: [true, 'Please provide a fund password'],
+      minlength: 4,
+      select: false,
+    },
     phone: {
       type: String,
       required: true,
@@ -123,16 +129,31 @@ const userSchema = new mongoose.Schema(
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
-    next();
+  if (!this.isModified('password') && !this.isModified('fundPassword')) {
+    return next();
   }
+
   const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  
+  if (this.isModified('password')) {
+    this.password = await bcrypt.hash(this.password, salt);
+  }
+
+  if (this.isModified('fundPassword')) {
+    this.fundPassword = await bcrypt.hash(this.fundPassword, salt);
+  }
+
+  next();
 });
 
 // Method to compare password
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Method to compare fund password
+userSchema.methods.matchFundPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.fundPassword);
 };
 
 module.exports = mongoose.model('User', userSchema);

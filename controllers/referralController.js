@@ -173,7 +173,7 @@ exports.applyReferralCode = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `Referral code applied successfully! You got ${REFERRAL_BONUS} BDT bonus`,
+      message: `Referral code applied successfully! You got ${REFERRAL_BONUS} USDT bonus`,
       wallet: user.wallet,
       referralInfo: {
         referralCode: user.referral.referralCode,

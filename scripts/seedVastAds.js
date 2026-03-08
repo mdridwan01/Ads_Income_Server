@@ -106,7 +106,7 @@ async function seedAds() {
         console.log(`   ${index + 1}. "${ad.title}"`);
         if (ad.vastUrl) console.log(`      VAST: ${ad.vastUrl.substring(0, 60)}...`);
         if (ad.mediaUrl) console.log(`      Media: ${ad.mediaUrl.substring(0, 60)}...`);
-        console.log(`      Reward: ${ad.rewardAmount} TK | Daily Limit: ${ad.dailyLimit}`);
+        console.log(`      Reward: ${ad.rewardAmount} USDT | Daily Limit: ${ad.dailyLimit}`);
       });
     }
 

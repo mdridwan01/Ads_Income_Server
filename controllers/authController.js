@@ -18,7 +18,15 @@ const generateReferralCode = () => {
 //  Register User
 exports.register = async (req, res) => {
   try {
-    const { username, email, password, phone, referralCode } = req.body;
+    const { username, email, password, fundPassword, phone, referralCode } = req.body;
+
+    // Validate fund password
+    if (!fundPassword || fundPassword.length < 4) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fund password must be at least 4 characters',
+      });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -41,6 +49,7 @@ exports.register = async (req, res) => {
       username,
       email,
       password,
+      fundPassword,
       phone,
       referral: {
         referralCode: generateReferralCode(),

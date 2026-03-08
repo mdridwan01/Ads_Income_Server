@@ -78,6 +78,7 @@ app.use('/api/public', require('./routes/public'));
 // level & deposit system
 app.use('/api/levels', require('./routes/levels'));
 app.use('/api/deposits', require('./routes/deposits'));
+app.use('/api/transfer', require('./routes/transfer'));
 app.use('/api/admin/reports', require('./routes/adminReports'));
 
 // Health check
@@ -96,7 +97,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '127.0.0.1', () => {
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 

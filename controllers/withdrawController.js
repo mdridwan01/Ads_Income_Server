@@ -4,16 +4,30 @@ const User = require('../models/User');
 // Request withdraw
 exports.requestWithdraw = async (req, res) => {
   try {
-    const { amount, withdrawalMethod, phoneNumber } = req.body;
+    const { amount, withdrawalMethod, phoneNumber, fundPassword } = req.body;
     const userId = req.user.id;
 
-    const user = await User.findById(userId);
+    // Validate fund password
+    if (!fundPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fund password is required',
+      });
+    }
+
+    const user = await User.findById(userId).select('+fundPassword');
 
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found',
       });
+    }
+
+    // Verify fund password
+    const isPasswordValid = await user.matchFundPassword(fundPassword);
+    if (!isPasswordValid) {
+      return res.status(401).json({ success: false, message: 'Invalid fund password' });
     }
 
     // only level 5 users allowed
@@ -40,7 +54,7 @@ exports.requestWithdraw = async (req, res) => {
     if (amount < 200) {
       return res.status(400).json({
         success: false,
-        message: 'Minimum withdrawal amount is 200 TK',
+        message: 'Minimum withdrawal amount is 200 USDT',
       });
     }
 
