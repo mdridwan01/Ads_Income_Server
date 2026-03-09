@@ -7,9 +7,14 @@ const depositSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  deposit_type: {
+    type: String,
+    enum: ['level_upgrade', 'quick_deposit'],
+    default: 'level_upgrade',
+  },
   level_target: {
     type: Number,
-    required: true,
+    default: null,
   },
   network: {
     type: String,

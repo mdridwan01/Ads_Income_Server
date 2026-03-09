@@ -1,51 +1,118 @@
 const Deposit = require('../models/Deposit');
 const Level = require('../models/Level');
 const User = require('../models/User');
+const Settings = require('../models/Settings');
 
 // user creates a deposit request
 exports.createDeposit = async (req, res) => {
   try {
-    const { level_target, network, wallet_address, amount, tx_hash } = req.body;
-    const userId = req.user.id;
+    const { deposit_type, level_target, network, wallet_address, amount, tx_hash } = req.body;
+    console.log('Deposit request received:', { deposit_type, level_target, network, amount, tx_hash: tx_hash ? 'present' : 'missing' });
+    
+    // Validate deposit_type is provided
+    if (!deposit_type) {
+      return res.status(400).json({ success: false, message: 'deposit_type is required' });
+    }
     const ipAddress = req.ip || req.connection.remoteAddress;
 
     // basic validation
-    const lvl = await Level.findOne({ id: level_target, is_active: true });
-    if (!lvl) {
-      return res.status(400).json({ success: false, message: 'Invalid level target' });
-    }
-    // ensure user is eligible (level_target = user.level+1)
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (level_target !== user.level + 1) {
-      return res.status(400).json({ success: false, message: 'Cannot skip or repeat levels' });
+
+    // Get platform wallet if not provided
+    let finalWalletAddress = wallet_address;
+    if (!finalWalletAddress) {
+      const settings = await Settings.findOne();
+      if (!settings) {
+        return res.status(400).json({ success: false, message: 'Platform wallet not configured' });
+      }
+      
+      if (network === 'TRC20') {
+        finalWalletAddress = settings.cryptoWallets.trc20;
+      } else if (network === 'ERC20') {
+        finalWalletAddress = settings.cryptoWallets.erc20;
+      }
+      
+      if (!finalWalletAddress) {
+        return res.status(400).json({ success: false, message: `${network} wallet not configured` });
+      }
     }
 
-    // ensure amount meets next level price
-    const nextLvl = await Level.findOne({ id: level_target, is_active: true });
-    if (!nextLvl) {
-      return res.status(400).json({ success: false, message: 'Invalid level target' });
+    // Validate amount
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid amount' });
     }
-    if (amount < nextLvl.price) {
-      return res.status(400).json({ success: false, message: 'Amount is less than required level price' });
+
+  // Handle level_upgrade type
+    if (deposit_type === 'level_upgrade') {
+      console.log('Processing level upgrade with level_target:', level_target);
+      if (!level_target) {
+        return res.status(400).json({ success: false, message: 'Level target required for level upgrade' });
+      }
+
+      const lvl = await Level.findOne({ id: level_target, is_active: true });
+      if (!lvl) {
+        console.log('Level not found for id:', level_target);
+        return res.status(400).json({ success: false, message: 'Invalid level target' });
+      }
+
+      // ensure user is eligible (level_target = user.level+1)
+      if (level_target !== user.level + 1) {
+        return res.status(400).json({ success: false, message: 'Cannot skip or repeat levels' });
+      }
+
+      // ensure amount meets next level price
+      if (amount < lvl.price) {
+        return res.status(400).json({ success: false, message: 'Amount is less than required level price' });
+      }
+    }
+    // Handle quick_deposit type - no level restrictions
+    else if (deposit_type === 'quick_deposit') {
+      console.log('Processing quick deposit');
+      // tx_hash is required for quick deposits
+      if (!tx_hash || tx_hash === 'auto-generated') {
+        return res.status(400).json({ success: false, message: 'Transaction hash is required' });
+      }
+
+      // Minimum deposit amount for quick deposits (e.g., 1 USDT)
+      const MIN_QUICK_DEPOSIT = 1;
+      if (amount < MIN_QUICK_DEPOSIT) {
+        return res.status(400).json({ success: false, message: `Minimum deposit amount is ${MIN_QUICK_DEPOSIT} USDT` });
+      }
+
+      // No restrictions on multiple pending quick deposits
+    }
+    // If deposit_type is neither, return error
+    else {
+      return res.status(400).json({ success: false, message: 'Invalid deposit type' });
+    }
+
+    // ensure tx_hash not already used (primary uniqueness check) - for quick deposits only
+    if (tx_hash && tx_hash !== 'auto-generated') {
+      const txUsed = await Deposit.findOne({ tx_hash });
+      if (txUsed) {
+        return res.status(400).json({ success: false, message: 'Transaction hash already used' });
+      }
+    }
+
+    // Generate unique tx_hash for level upgrades
+    let finalTxHash = tx_hash;
+    if (deposit_type === 'level_upgrade' || !finalTxHash || finalTxHash === 'auto-generated') {
+      // Generate unique hash format: LEVEL_<userId>_<timestamp>_<random>
+      finalTxHash = `LEVEL_${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
     // create deposit expires in 15 minutes
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    // ensure tx_hash not already used (primary uniqueness check)
-    const txUsed = await Deposit.findOne({ tx_hash });
-    if (txUsed) {
-      return res.status(400).json({ success: false, message: 'Transaction hash already used' });
-    }
-
     const deposit = new Deposit({
       userId,
-      level_target,
+      deposit_type,
+      level_target: deposit_type === 'level_upgrade' ? level_target : null, // Ensure level_target is null for quick deposits
       network,
-      wallet_address,
+      wallet_address: finalWalletAddress,
       amount,
-      tx_hash,
+      tx_hash: finalTxHash,
       ip_address: ipAddress,
       expires_at: expiresAt,
     });
@@ -111,19 +178,8 @@ exports.approveDeposit = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Deposit has expired' });
     }
 
-    // ensure amount sufficient
-    const lvl = await Level.findOne({ id: deposit.level_target });
-    if (!lvl) return res.status(400).json({ success: false, message: 'Invalid level' });
-    if (deposit.amount < lvl.price) {
-      return res.status(400).json({ success: false, message: 'Amount less than required price' });
-    }
-
-    // upgrade user level
     const user = await User.findById(deposit.userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (user.level + 1 !== deposit.level_target) {
-      return res.status(400).json({ success: false, message: 'User level mismatch' });
-    }
 
     // ensure tx_hash hasn't been approved elsewhere (double-spend)
     const approvedTx = await Deposit.findOne({ tx_hash: deposit.tx_hash, status: 'approved', _id: { $ne: deposit._id } });
@@ -131,9 +187,25 @@ exports.approveDeposit = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Transaction already approved for another deposit' });
     }
 
-    user.level = deposit.level_target;
+    // Handle level_upgrade deposits
+    if (deposit.deposit_type === 'level_upgrade') {
+      // ensure amount sufficient
+      const lvl = await Level.findOne({ id: deposit.level_target });
+      if (!lvl) return res.status(400).json({ success: false, message: 'Invalid level' });
+      if (deposit.amount < lvl.price) {
+        return res.status(400).json({ success: false, message: 'Amount less than required price' });
+      }
 
-    // add deposit amount to wallet balances
+      // Check user level matches
+      if (user.level + 1 !== deposit.level_target) {
+        return res.status(400).json({ success: false, message: 'User level mismatch' });
+      }
+
+      // Upgrade user level
+      user.level = deposit.level_target;
+    }
+
+    // Add deposit amount to wallet balances (for both types)
     user.wallet.depositBalance = (user.wallet.depositBalance || 0) + deposit.amount;
     user.wallet.availableBalance += deposit.amount;
     user.wallet.totalIncome += deposit.amount; // treat deposit as income
