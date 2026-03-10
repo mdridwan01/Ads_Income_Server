@@ -21,24 +21,24 @@ const User = require('./models/User');
       { 
         userId: user._id, 
         amount: 500, 
-        withdrawalMethod: 'bkash', 
-        phoneNumber: '01712345678', 
+        withdrawalMethod: 'TRC20', 
+        walletAddress: 'TXabc1234567890',
         status: 'completed',
         createdAt: new Date(Date.now() - 3600000)
       },
       { 
         userId: user._id, 
         amount: 1000, 
-        withdrawalMethod: 'nagad', 
-        phoneNumber: '01987654321', 
+        withdrawalMethod: 'ERC20', 
+        walletAddress: '0xdeadbeef12345678',
         status: 'completed',
         createdAt: new Date(Date.now() - 7200000)
       },
       { 
         userId: user._id, 
         amount: 750, 
-        withdrawalMethod: 'bkash', 
-        phoneNumber: '01556789012', 
+        withdrawalMethod: 'TRC20', 
+        walletAddress: 'TX9876543210',
         status: 'completed',
         createdAt: new Date(Date.now() - 10800000)
       }

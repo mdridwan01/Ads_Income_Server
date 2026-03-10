@@ -4,12 +4,13 @@ const Transfer = require('../models/Transfer');
 // Transfer balance from sender to receiver (P2P)
 exports.transferBalance = async (req, res) => {
   try {
-    const { receiverUsername, amount, fundPassword } = req.body;
+    // allow receiver identified by username OR uid
+    const { receiverUsername, receiverUid, amount, fundPassword } = req.body;
     const senderId = req.user.id;
 
     // Validate input
-    if (!receiverUsername || !amount || amount <= 0 || !fundPassword) {
-      return res.status(400).json({ success: false, message: 'Invalid input - fundPassword is required' });
+    if ((!receiverUsername && !receiverUid) || !amount || amount <= 0 || !fundPassword) {
+      return res.status(400).json({ success: false, message: 'Invalid input - fundPassword and receiver required' });
     }
 
     // Find sender
@@ -34,8 +35,14 @@ exports.transferBalance = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Insufficient balance' });
     }
 
-    // Find receiver
-    const receiver = await User.findOne({ username: receiverUsername });
+    // Find receiver by username or uid
+    let receiver = null;
+    if (receiverUid) {
+      receiver = await User.findOne({ uid: receiverUid });
+    }
+    if (!receiver && receiverUsername) {
+      receiver = await User.findOne({ username: receiverUsername });
+    }
     if (!receiver) {
       return res.status(404).json({ success: false, message: 'Receiver not found' });
     }
@@ -88,8 +95,8 @@ exports.getTransferHistory = async (req, res) => {
     const transfers = await Transfer.find({
       $or: [{ senderId: userId }, { receiverId: userId }],
     })
-      .populate('senderId', 'username')
-      .populate('receiverId', 'username')
+      .populate('senderId', 'username uid')
+      .populate('receiverId', 'username uid')
       .sort({ createdAt: -1 });
 
     res.status(200).json({ success: true, transfers });

@@ -4,7 +4,7 @@ const User = require('../models/User');
 // Request withdraw
 exports.requestWithdraw = async (req, res) => {
   try {
-    const { amount, withdrawalMethod, phoneNumber, fundPassword } = req.body;
+    const { amount, withdrawalMethod, phoneNumber, walletAddress, fundPassword } = req.body;
     const userId = req.user.id;
 
     // Validate fund password
@@ -65,6 +65,17 @@ exports.requestWithdraw = async (req, res) => {
       });
     }
 
+    // method-specific address validation
+    if (withdrawalMethod === 'TRC20' || withdrawalMethod === 'ERC20') {
+      if (!walletAddress) {
+        return res.status(400).json({ success: false, message: 'Wallet address is required for crypto withdrawals' });
+      }
+    } else {
+      if (!phoneNumber) {
+        return res.status(400).json({ success: false, message: 'Phone number is required' });
+      }
+    }
+
     const deviceInfo = req.headers['user-agent'] || 'Unknown';
     const ipAddress = req.ip || req.connection.remoteAddress;
 
@@ -72,6 +83,7 @@ exports.requestWithdraw = async (req, res) => {
       userId,
       amount,
       withdrawalMethod,
+      walletAddress,
       phoneNumber,
       processedDetails: {
         ipAddress,
@@ -283,14 +295,19 @@ exports.getPublicWithdrawals = async (req, res) => {
       .sort({ createdAt: -1 });
 
     // Mask user information
-    const maskedWithdrawals = withdrawals.map((wd) => ({
-      _id: wd._id,
-      amount: wd.amount,
-      withdrawalMethod: wd.withdrawalMethod,
-      createdAt: wd.createdAt,
-      username: maskUsername(wd.userId?.username || 'User'),
-      phone: maskPhone(wd.userId?.phone || 'N/A'),
-    }));
+    const maskedWithdrawals = withdrawals.map((wd) => {
+      // choose contact info - prefer walletAddress or phoneNumber on withdraw object,
+      // fall back to user's registered phone if neither present
+      const rawContact = wd.walletAddress || wd.phoneNumber || wd.userId?.phone || 'N/A';
+      return {
+        _id: wd._id,
+        amount: wd.amount,
+        withdrawalMethod: wd.withdrawalMethod,
+        createdAt: wd.createdAt,
+        username: maskUsername(wd.userId?.username || 'User'),
+        contact: maskPhone(rawContact),
+      };
+    });
 
     const total = await Withdraw.countDocuments({ status: 'completed' });
     res.status(200).json({

@@ -18,7 +18,17 @@ const generateReferralCode = () => {
 //  Register User
 exports.register = async (req, res) => {
   try {
-    const { username, email, password, fundPassword, phone, referralCode } = req.body;
+    const { fullName, username, email, password, fundPassword, phone, referralCode } = req.body;
+
+    // full name required
+    if (!fullName || fullName.trim().length < 3) {
+      return res.status(400).json({ success: false, message: 'Full name is required' });
+    }
+
+    // username must not contain spaces
+    if (!username || /\s/.test(username)) {
+      return res.status(400).json({ success: false, message: 'Username cannot contain spaces' });
+    }
 
     // Validate fund password
     if (!fundPassword || fundPassword.length < 4) {
@@ -46,6 +56,7 @@ exports.register = async (req, res) => {
 
     // Create new user
     const user = new User({
+      fullName,
       username,
       email,
       password,
@@ -192,6 +203,8 @@ exports.login = async (req, res) => {
       token,
       user: {
         id: user._id,
+        uid: user.uid,
+        fullName: user.fullName,
         username: user.username,
         email: user.email,
         phone: user.phone || '',
@@ -230,6 +243,8 @@ exports.verifyToken = async (req, res) => {
       success: true,
       user: {
         id: user._id,
+        uid: user.uid,
+        fullName: user.fullName,
         username: user.username,
         email: user.email,
         role: user.role,

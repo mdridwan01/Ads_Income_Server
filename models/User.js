@@ -1,14 +1,27 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema(
   {
+    fullName: {
+      type: String,
+      required: [true, 'Please provide your full name'],
+      trim: true,
+      minlength: 3,
+    },
     username: {
       type: String,
       required: [true, 'Please provide a username'],
       unique: true,
       trim: true,
       minlength: 3,
+      match: [/^[^\s]+$/, 'Username cannot contain spaces'],
+    },
+    uid: {
+      type: String,
+      unique: true,
+      index: true,
     },
     email: {
       type: String,
@@ -118,6 +131,12 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // unique user id for P2P transfers
+    uid: {
+      type: String,
+      unique: true,
+      index: true,
+    },
     ip_address: String,
     is_suspicious: {
       type: Boolean,
@@ -155,5 +174,15 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 userSchema.methods.matchFundPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.fundPassword);
 };
+
+
+// before saving, ensure uid exists
+userSchema.pre('save', function(next) {
+  if (!this.uid) {
+    // generate a short unique identifier, 8 chars hex
+    this.uid = crypto.randomBytes(4).toString('hex');
+  }
+  next();
+});
 
 module.exports = mongoose.model('User', userSchema);

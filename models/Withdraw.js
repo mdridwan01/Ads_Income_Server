@@ -14,12 +14,13 @@ const withdrawSchema = new mongoose.Schema(
     },
     withdrawalMethod: {
       type: String,
-      enum: ['bkash', 'nagad'],
+      enum: ['bkash', 'nagad', 'TRC20', 'ERC20'],
       required: true,
     },
+    walletAddress: String,
     phoneNumber: {
       type: String,
-      required: true,
+      // only required for legacy bkash/nagad methods; validation done in controller
     },
     status: {
       type: String,

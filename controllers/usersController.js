@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Level = require('../models/Level');
 const Deposit = require('../models/Deposit');
+const Withdraw = require('../models/Withdraw');
 const bcrypt = require('bcryptjs');
 
 // Get user profile
@@ -76,18 +77,19 @@ exports.getProfile = async (req, res) => {
 // Update user profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { phone, withdrawalMethod, withdrawalPhoneNumber, adTypes } = req.body;
+    const { fullName, username, phone, withdrawalMethod, withdrawalPhoneNumber, adTypes } = req.body;
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      {
-        ...(phone && { phone }),
-        ...(withdrawalMethod && { withdrawalMethod }),
-        ...(withdrawalPhoneNumber && { withdrawalPhoneNumber }),
-        ...(adTypes && { adTypes }),
-      },
-      { new: true }
-    );
+    const updateData = {
+      ...(fullName && { fullName }),
+      // username change is not permitted via frontend but allow if provided and unique
+      ...(username && { username }),
+      ...(phone && { phone }),
+      ...(withdrawalMethod && { withdrawalMethod }),
+      ...(withdrawalPhoneNumber && { withdrawalPhoneNumber }),
+      ...(adTypes && { adTypes }),
+    };
+
+    const user = await User.findByIdAndUpdate(req.user.id, updateData, { new: true });
 
     res.status(200).json({
       success: true,
@@ -114,12 +116,20 @@ exports.getWallet = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
 
+    // compute pending withdrawals amount so frontend can show locked funds
+    const pendingDocs = await Withdraw.find({
+      userId: user._id,
+      status: 'pending',
+    });
+    const pendingAmount = pendingDocs.reduce((sum, w) => sum + (w.amount || 0), 0);
+
     res.status(200).json({
       success: true,
       wallet: user.wallet,
       level: user.level,
       last_withdraw_at: user.last_withdraw_at,
       is_suspicious: user.is_suspicious,
+      pending_withdrawals: pendingAmount,
     });
   } catch (error) {
     res.status(500).json({
