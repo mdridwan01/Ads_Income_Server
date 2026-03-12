@@ -7,6 +7,7 @@ const Settings = require('../models/Settings');
 exports.createDeposit = async (req, res) => {
   try {
     const { deposit_type, level_target, network, wallet_address, amount, tx_hash } = req.body;
+    const userId = req.user.id; // Extract userId from authenticated user
     console.log('Deposit request received:', { deposit_type, level_target, network, amount, tx_hash: tx_hash ? 'present' : 'missing' });
     
     // Validate deposit_type is provided

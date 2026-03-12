@@ -5,24 +5,18 @@ const Transfer = require('../models/Transfer');
 exports.transferBalance = async (req, res) => {
   try {
     // allow receiver identified by username OR uid
-    const { receiverUsername, receiverUid, amount, fundPassword } = req.body;
+    const { receiverUsername, receiverUid, amount } = req.body;
     const senderId = req.user.id;
 
     // Validate input
-    if ((!receiverUsername && !receiverUid) || !amount || amount <= 0 || !fundPassword) {
-      return res.status(400).json({ success: false, message: 'Invalid input - fundPassword and receiver required' });
+    if ((!receiverUsername && !receiverUid) || !amount || amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid input - receiver and amount required' });
     }
 
     // Find sender
-    const sender = await User.findById(senderId).select('+fundPassword');
+    const sender = await User.findById(senderId);
     if (!sender) {
       return res.status(404).json({ success: false, message: 'Sender not found' });
-    }
-
-    // Verify fund password
-    const isPasswordValid = await sender.matchFundPassword(fundPassword);
-    if (!isPasswordValid) {
-      return res.status(401).json({ success: false, message: 'Invalid fund password' });
     }
 
     // Check if sender has completed level 5
